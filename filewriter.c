@@ -17,7 +17,7 @@
 
 /*** Definitions ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
-#define BUFF_INIT {null, 0}
+#define BUFF_INIT {NULL, 0}
 
 /***  original flags data ***/
 struct editorConfig {
@@ -110,7 +110,7 @@ int getWindowSize (int *rows, int *cols) {
 struct Buffer {
 	char *b;
 	int len;
-}
+};
 
 //Buffer Append func
 void bufferAppend (struct Buffer *buffer, const char *s, int len) {
@@ -128,21 +128,33 @@ void bufferFree (struct Buffer *buffer) {
 }
 
 /*** Output ***/
-void editorDrawRows() {
+void editorDrawRows(struct Buffer *buffer) {
 	int y;
 	for (y = 0; y < E.screenrows; y++) {
-		write(STDOUT_FILENO, "~", 1);
-		if (y < E.screenrows - 1) write(STDOUT_FILENO, "\r\n", 2);
+		bufferAppend (buffer, ">", 1);
+		//write(STDOUT_FILENO, "~", 1);
+		if (y < E.screenrows - 1) bufferAppend (buffer, "\r\n", 2); //write(STDOUT_FILENO, "\r\n", 2);
 	}
 }
 
 void editorRefreshScreen () {
-	write(STDOUT_FILENO, "\x1b[2J", 4);
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	//write(STDOUT_FILENO, "\x1b[2J", 4);
+	//write(STDOUT_FILENO, "\x1b[H", 3);
+	struct Buffer buff = BUFF_INIT;
+	
+	bufferAppend(&buff, "\x1b[?25l", 6);	
+	bufferAppend(&buff, "\x1b[2J", 4);
+	bufferAppend(&buff, "\x1b[H", 3);
 
-	editorDrawRows();
+	editorDrawRows(&buff);
 
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	//write(STDOUT_FILENO, "\x1b[H", 3);
+	
+	bufferAppend(&buff, "\x1b[H", 3);
+	buffAppend(&buff, "\x1b[?25h", 6);
+
+	write(STDOUT_FILENO, buff.b, buff.len);
+	bufferFree(&buff);
 }
 
 /*** Input ***/
