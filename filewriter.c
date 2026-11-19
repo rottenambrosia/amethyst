@@ -105,7 +105,6 @@ int getWindowSize (int *rows, int *cols) {
 	}
 }
 
-//hell no
 /*** Appending Buffer for Write ***/
 
 struct Buffer {
