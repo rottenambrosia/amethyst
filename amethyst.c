@@ -63,7 +63,7 @@ void enableRawMode () {
 	BRKINT -> Break condition similar to SIGINT (Ctrl + C)
 	INPCK -> Enables parity checking, not for modern terminal ecosystems
 	ISTRIP -> Strips (Resets) the 8th bit of each input byte to be stripped (Prolly already off)
-	IXON -> Ctrl + V/O)
+	IXON -> Ctrl + V/O 
 	*/
 	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 	

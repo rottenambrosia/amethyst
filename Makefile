@@ -6,4 +6,3 @@
 amethyst: amethyst.c
 	$(CC) amethyst.c -o amethyst_editor.exe -Wall -Wextra -pedantic -std=c99
 	$(CC) amethyst.c -o amethyst_editor -Wall -Wextra -pedantic -std=c99
-
