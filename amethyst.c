@@ -18,9 +18,21 @@
 /*** Definitions ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define BUFF_INIT {NULL, 0}
+#define AMETHYST_VER "0.0.1"
+
+enum editorKey {
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN,
+	PAGE_UP,
+	PAGE_DOWN
+};
+
 
 /***  original flags data ***/
 struct editorConfig {
+	int cx, cy;
 	int screenrows;
 	int screencols;
 	struct termios orig_termios;
@@ -85,12 +97,44 @@ void enableRawMode () {
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("Failed to set attributes while enablind raw mode");
 }
 
-char editorReadKey () {
+int editorReadKey () {
 	int nread; // holds the {-1, 0, 1} value from read and checks error condition only if it's not 1
 	char c;
 	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
 		if (nread == -1 && errno != EAGAIN) die("Failed to read");
-	} return c;
+	}
+
+	if (c == '\x1b') {
+		char seq[3];
+
+		if (read(STDOUT_FILENO, &seq[0], 1) != 1) return '\x1b';
+		if (read(STDOUT_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+		if (seq[0] == '[') {
+			if (seq[1] >= '0' && seq[1] <= '9') {
+				if (read(STDOUT_FILENO, &seq[2], 1) != -1) return '\x1b';
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+						case '5' : 
+							return PAGE_UP;
+						case '6' :
+							return PAGE_DOWN;
+					}
+				}
+			} else {
+				switch (seq[1]) {
+					case 'A' : return ARROW_UP;
+					case 'B' : return ARROW_DOWN;
+					case 'C' : return ARROW_LEFT;
+					case 'D' : return ARROW_RIGHT;
+				}
+			}
+		}
+
+		return '\x1b';
+	} else {
+		return c;
+	}
 }
 
 int getWindowSize (int *rows, int *cols) {
@@ -130,48 +174,101 @@ void bufferFree (struct Buffer *buffer) {
 /*** Output ***/
 void editorDrawRows(struct Buffer *buffer) {
 	int y;
+
 	for (y = 0; y < E.screenrows; y++) {
-		bufferAppend (buffer, ">", 1);
+		
+		if (y == E.screenrows / 5) {
+			char welcome[80];
+			int welcome_len = snprintf(welcome, sizeof(welcome), 
+					"\e[1;3;38;2;153;102;204mAmethyst Editor\e[0m --ver%s", AMETHYST_VER);
+			if (welcome_len > E.screencols) welcome_len = E.screencols;
+			
+			int padding = (E.screencols - welcome_len) / 2;
+			if (padding) {
+				bufferAppend(buffer, ">", 1);
+				padding--;
+			} while (padding--) bufferAppend(buffer, " ", 1);
+			
+			bufferAppend (buffer, welcome, welcome_len);
+		} else {		
+			bufferAppend (buffer, ">", 1);
+		}
+		bufferAppend (buffer, "\x1b[K", 3);
 		//write(STDOUT_FILENO, "~", 1);
 		if (y < E.screenrows - 1) bufferAppend (buffer, "\r\n", 2); //write(STDOUT_FILENO, "\r\n", 2);
 	}
 }
 
 void editorRefreshScreen () {
-	//write(STDOUT_FILENO, "\x1b[2J", 4);
-	//write(STDOUT_FILENO, "\x1b[H", 3);
 	struct Buffer buff = BUFF_INIT;
 	
 	bufferAppend(&buff, "\x1b[?25l", 6);	
-	bufferAppend(&buff, "\x1b[2J", 4);
 	bufferAppend(&buff, "\x1b[H", 3);
 
 	editorDrawRows(&buff);
-
-	//write(STDOUT_FILENO, "\x1b[H", 3);
 	
-	bufferAppend(&buff, "\x1b[H", 3);
-	buffAppend(&buff, "\x1b[?25h", 6);
+	char buf[32];
+	snprintf(buf, sizeof(buf), "\x1b[%d,%dH", E.cx + 1, E.cy + 1);
+	bufferAppend(&buff, buf, strlen(buf));	
+
+	bufferAppend(&buff, "\x1b[?25h", 6);
 
 	write(STDOUT_FILENO, buff.b, buff.len);
 	bufferFree(&buff);
 }
 
 /*** Input ***/
+
+void editorMoveCursor (int key) {
+	switch (key) {
+		case ARROW_LEFT:
+			if (E.cx != 0) {
+				E.cx--;
+			}
+			break;
+		case ARROW_RIGHT:
+			if (E.cx != E.screencols - 1) {
+				E.cx++;
+			}
+			break;
+		case ARROW_UP:
+			if (E.cy != 0) {
+				E.cy++;
+			}
+			break;
+		case ARROW_DOWN:
+			if (E.cy != E.screenrows - 1) {
+				E.cy--;
+			}
+			break;
+	}
+}
+
 void editorProcessKeypress () {
-	char c = editorReadKey();
+	int c = editorReadKey();
 	switch (c) {
 		case CTRL_KEY('q') :
 			write(STDOUT_FILENO, "\x1b[2J", 4);
 			write(STDOUT_FILENO, "\x1b[H", 3);
 			exit (0);
 			break;
+
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
+			editorMoveCursor(c);
+			break;
 	}
 }
 
 /*** init ***/
 void initEditor () {
-    if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("Windows Size get failed");
+	
+	E.cx = 0;
+	E.cy = 0;
+
+	if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("Windows Size get failed");
 }
 
 int main () {
