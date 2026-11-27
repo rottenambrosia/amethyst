@@ -10,6 +10,7 @@
 #include <termios.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <errno.h>
@@ -303,7 +304,8 @@ void initEditor () {
 	
 	E.cx = 0;
 	E.cy = 0;
-
+	E.numrows = 0;
+	
 	if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("Windows Size get failed");
 }
 
